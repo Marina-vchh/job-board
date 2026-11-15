@@ -11,6 +11,7 @@ import HistoryPage from './pages/History'
 import Profiles from './pages/Profiles'
 import Sources from './pages/Sources'
 import SettingsPage from './pages/Settings'
+import ErrorBoundary from './components/ErrorBoundary'
 
 type Gate = { phase: 'loading' } | { phase: 'error'; message: string } | { phase: 'ready'; ws: WorkspaceState }
 
@@ -123,12 +124,14 @@ function Shell({ onLock }: { onLock: () => void }) {
 
       <main className="min-w-0 flex-1 pb-20 md:pb-0">
         <div className="mx-auto max-w-6xl px-4 py-5 md:px-8 md:py-8">
-          {route === 'dashboard' && <Dashboard />}
-          {route === 'vacancies' && <VacancyList params={params} />}
-          {route === 'history' && <HistoryPage />}
-          {route === 'profiles' && <Profiles />}
-          {route === 'sources' && <Sources />}
-          {route === 'settings' && <SettingsPage />}
+          <ErrorBoundary resetKey={route}>
+            {route === 'dashboard' && <Dashboard />}
+            {route === 'vacancies' && <VacancyList params={params} />}
+            {route === 'history' && <HistoryPage />}
+            {route === 'profiles' && <Profiles />}
+            {route === 'sources' && <Sources />}
+            {route === 'settings' && <SettingsPage />}
+          </ErrorBoundary>
         </div>
       </main>
 

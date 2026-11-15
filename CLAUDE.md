@@ -2,7 +2,7 @@
 
 Personal job-search aggregator for one user (Marina, Prague, Europe/Prague timezone). Collects vacancies
 from job boards and Telegram channels, deduplicates, scores 0–100 against search profiles, stores them in
-Supabase, and gives a morning digest + a review tracker. **Out of scope for now:** auto-applying, CVs, cover letters.
+Supabase, and gives a morning digest + a review tracker. **Out of scope for now:** auto-applying, CVs. (Cover letters: template-based, see below.)
 
 The user is not a developer and writes in Russian — reply in Russian, keep explanations plain.
 
@@ -17,6 +17,14 @@ The user is not a developer and writes in Russian — reply in Russian, keep exp
 > Файлы фронтенда сейчас: `src/lib/{supabase,pin,api,store,format,router,types}.ts(x)`,
 > `src/components/{ui,Vacancy}.tsx`, `src/pages/{Pin,Dashboard,VacancyList,History,Profiles,Sources,Settings}.tsx`.
 > `npm run build:single` → `dist-single/index.html` (один файл), его копия — `job-radar.html` в корне.
+> Публикация: сборка `dist/` пушится в ветку `gh-pages` → https://marina-vchh.github.io/job-board/ (PIN задан 2026-11-13).
+>
+> 2026-11-15: карточки вакансий упрощены (название, кратко, ссылка, статус). Сопроводительные письма — `src/lib/letter.ts`,
+> **без LLM**: шаблон из «Обо мне» (Профили) + навыки, совпавшие с текстом вакансии; редактируются в карточке.
+> Хранение: `app_settings.about_me` (jsonb) и `vacancies.cover_letter` (text) — колонки добавляет
+> `supabase/migrations/20261115000005_cover_letters.sql` (пользователь запускает в SQL Editor); пока их нет — localStorage
+> (`src/lib/about.ts`). Профили: поля-списки читаются/пишутся в том формате, в каком хранятся в базе (`toList`/`fromList`),
+> поля нестрокового формата — только для чтения. Готовые профили под роли — `PRESETS` в `src/pages/Profiles.tsx`.
 
 ## Live deployment (already running — don't recreate)
 
@@ -113,4 +121,4 @@ does not (network is blocked there → "AuthRetryableFetchError: Failed to fetch
 5. Recruiter/HR contacts: allowed approach = "Find recruiter on LinkedIn" button (prefilled people search the user
    opens herself) + extract contacts present in the vacancy text. No LinkedIn scraping.
 6. LinkedIn job alerts → Gmail Apps Script that forwards alert emails to `/ingest-email`.
-7. Add "Change PIN" to Settings (RPC `set_pin` already allows the owner to change it).
+7. ~~Add "Change PIN" to Settings~~ — done (frontend).
