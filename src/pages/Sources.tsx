@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
-import { AlertTriangle, Copy, Loader2, Mail, Settings2 } from 'lucide-react'
-import { importEmail, listSources, updateSource } from '../lib/api'
+import { AlertTriangle, Copy, Loader2, Mail, Plus, Send, Settings2, X } from 'lucide-react'
+import { createSource, importEmail, listSources, updateSource } from '../lib/api'
 import { useStore } from '../lib/store'
 import { relTime } from '../lib/format'
 import { SUPABASE_URL } from '../lib/supabase'
@@ -67,6 +67,8 @@ export default function Sources() {
         <b>LinkedIn, Indeed, Glassdoor, Wellfound, Work.ua</b> не дают открытого доступа к вакансиям. Их можно получать через письма-подписки:
         подпишитесь на рассылку вакансий на сайте, а пришедшее письмо вставьте через «Импорт письма» (или настройте автопересылку на адрес ниже).
       </div>
+
+      {sources && <TelegramChannels sources={sources} setSources={setSources} />}
 
       {error && <p className="card p-4 text-sm text-rose-600">{error}</p>}
       {!sources && !error && (
@@ -228,5 +230,160 @@ function ImportEmail({ open, onClose, token }: { open: boolean; onClose: () => v
         </div>
       )}
     </Modal>
+  )
+}
+
+// ---------- Telegram-каналы ----------
+// Каналы по iGaming / Dating / Adult (найдены поиском, публичные; проверьте сами перед откликом)
+const SUGGESTED: { handle: string; note: string }[] = [
+  { handle: 'igaming_work', note: 'iGaming jobs, ~15k подписчиков' },
+  { handle: 'betting_job', note: 'Работа в ставках и гемблинге' },
+  { handle: 'opento_igaming', note: 'iGaming / casino / affiliate' },
+  { handle: 'hrcpa', note: 'CPA, affiliate: гемблинг, беттинг' },
+  { handle: 'affmon_hr', note: 'Affiliate Monitor: серые ниши' },
+  { handle: 'GamblingServices', note: 'Гемблинг-объявления и вакансии' },
+]
+
+const CHANNEL_KEYS = ['channel', 'username', 'handle', 'slug', 'name']
+
+function normalizeHandle(raw: string) {
+  return raw
+    .trim()
+    .replace(/^https?:\/\//, '')
+    .replace(/^(www\.)?t\.me\/(s\/)?/i, '')
+    .replace(/^@/, '')
+    .replace(/[/?#].*$/, '')
+}
+
+/** Как в базе хранятся каналы: списком в одном источнике или по источнику на канал. */
+function telegramLayout(sources: Source[]) {
+  const tg = sources.filter((s) => kindGroup(s.kind) === 'telegram')
+  for (const s of tg) {
+    const cfg = s.config ?? {}
+    const key = Object.keys(cfg).find((k) => Array.isArray(cfg[k]) && (cfg[k] as unknown[]).every((x) => typeof x === 'string'))
+    if (key) return { mode: 'list' as const, source: s, key, channels: (cfg[key] as string[]).map(normalizeHandle) }
+  }
+  const rows = tg.map((s) => {
+    const cfg = s.config ?? {}
+    const key = CHANNEL_KEYS.find((k) => typeof cfg[k] === 'string')
+    return { s, key, handle: normalizeHandle(key ? String(cfg[key]) : s.name) }
+  })
+  return { mode: 'rows' as const, rows, template: rows.find((r) => r.key) ?? rows[0] }
+}
+
+function TelegramChannels({ sources, setSources }: { sources: Source[]; setSources: (f: (s: Source[] | null) => Source[] | null) => void }) {
+  const { toast } = useStore()
+  const [input, setInput] = useState('')
+  const [busy, setBusy] = useState(false)
+  const layout = telegramLayout(sources)
+
+  const current: string[] =
+    layout.mode === 'list' ? layout.channels : layout.rows.filter((r) => r.s.enabled).map((r) => r.handle)
+  const has = (h: string) => current.some((c) => c.toLowerCase() === h.toLowerCase())
+
+  const add = async (raw: string) => {
+    const handle = normalizeHandle(raw)
+    if (!/^[A-Za-z][\w]{3,31}$/.test(handle)) return toast('Это не похоже на имя канала. Пример: igaming_work или https://t.me/igaming_work', 'error')
+    if (has(handle)) return toast('Этот канал уже есть')
+    setBusy(true)
+    try {
+      if (layout.mode === 'list') {
+        const cfg = { ...(layout.source.config ?? {}), [layout.key]: [...((layout.source.config?.[layout.key] as string[]) ?? []), handle] }
+        await updateSource(layout.source.id, { config: cfg })
+        setSources((l) => l?.map((x) => (x.id === layout.source.id ? { ...x, config: cfg } : x)) ?? null)
+      } else {
+        const existing = layout.rows.find((r) => r.handle.toLowerCase() === handle.toLowerCase())
+        if (existing) {
+          await updateSource(existing.s.id, { enabled: true })
+          setSources((l) => l?.map((x) => (x.id === existing.s.id ? { ...x, enabled: true } : x)) ?? null)
+        } else {
+          const t = layout.template
+          const config = t?.key ? { ...(t.s.config ?? {}), [t.key]: handle } : { channel: handle }
+          const created = await createSource({ name: '@' + handle, kind: t?.s.kind ?? 'telegram', enabled: true, config })
+          setSources((l) => (l ? [...l, created] : [created]))
+        }
+      }
+      setInput('')
+      toast(`@${handle} добавлен. Вакансии из него появятся после следующего поиска.`)
+    } catch (e) {
+      toast('Не получилось добавить: ' + (e as Error).message, 'error')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const remove = async (handle: string) => {
+    setBusy(true)
+    try {
+      if (layout.mode === 'list') {
+        const list = ((layout.source.config?.[layout.key] as string[]) ?? []).filter((c) => normalizeHandle(c).toLowerCase() !== handle.toLowerCase())
+        const cfg = { ...(layout.source.config ?? {}), [layout.key]: list }
+        await updateSource(layout.source.id, { config: cfg })
+        setSources((l) => l?.map((x) => (x.id === layout.source.id ? { ...x, config: cfg } : x)) ?? null)
+      } else {
+        const row = layout.rows.find((r) => r.handle.toLowerCase() === handle.toLowerCase())
+        if (row) {
+          await updateSource(row.s.id, { enabled: false })
+          setSources((l) => l?.map((x) => (x.id === row.s.id ? { ...x, enabled: false } : x)) ?? null)
+        }
+      }
+    } catch (e) {
+      toast('Не получилось убрать: ' + (e as Error).message, 'error')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <section className="card mb-6 p-5">
+      <h2 className="flex items-center gap-2 font-semibold">
+        <Send className="size-4 text-sky-500" /> Telegram-каналы
+        <span className="text-sm font-normal text-slate-400">{current.length}</span>
+      </h2>
+      <p className="mt-1 text-sm text-slate-500">
+        Приложение читает открытые каналы. Уберите крестиком каналы не по вашим нишам, а нужные добавьте.
+      </p>
+
+      <div className="mt-3 flex flex-wrap gap-1.5">
+        {current.map((c) => (
+          <span key={c} className="chip bg-sky-50 py-1 text-sky-800 ring-sky-200 dark:bg-sky-950 dark:text-sky-300 dark:ring-sky-900">
+            <a href={`https://t.me/s/${c}`} target="_blank" rel="noreferrer" className="hover:underline">
+              @{c}
+            </a>
+            <button onClick={() => remove(c)} disabled={busy} className="text-sky-400 hover:text-rose-600" title="Убрать канал">
+              <X className="size-3" />
+            </button>
+          </span>
+        ))}
+        {!current.length && <span className="text-sm text-slate-400">Каналов нет</span>}
+      </div>
+
+      <form
+        className="mt-3 flex gap-2"
+        onSubmit={(e) => {
+          e.preventDefault()
+          void add(input)
+        }}
+      >
+        <input className="input max-w-sm" placeholder="@channel или ссылка t.me/…" value={input} onChange={(e) => setInput(e.target.value)} />
+        <button className="btn-primary" disabled={busy || !input.trim()}>
+          {busy ? <Loader2 className="size-4 animate-spin" /> : <Plus className="size-4" />} Добавить
+        </button>
+      </form>
+
+      {SUGGESTED.some((x) => !has(x.handle)) && (
+        <div className="mt-4">
+          <p className="label">Каналы с вакансиями iGaming / affiliate, добавляются в один клик</p>
+          <div className="flex flex-wrap gap-2">
+            {SUGGESTED.filter((x) => !has(x.handle)).map((x) => (
+              <button key={x.handle} className="btn-outline py-1.5 text-left" onClick={() => add(x.handle)} disabled={busy} title={x.note}>
+                <Plus className="size-3.5" /> @{x.handle}
+                <span className="hidden text-xs font-normal text-slate-400 sm:inline">· {x.note}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </section>
   )
 }

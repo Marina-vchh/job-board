@@ -117,6 +117,13 @@ export async function updateSource(id: string, patch: Partial<Source>) {
   if (error) fail(error)
 }
 
+export async function createSource(row: Partial<Source>): Promise<Source> {
+  const user_id = await currentUserId()
+  const { data, error } = await supabase.from('sources').insert({ ...row, user_id }).select().single()
+  if (error) fail(error)
+  return data as Source
+}
+
 // ---------- Настройки ----------
 export async function getSettings(): Promise<AppSettings | null> {
   const { data, error } = await supabase.from('app_settings').select('*').maybeSingle()

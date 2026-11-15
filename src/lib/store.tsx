@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 import * as api from './api'
 import type { AppSettings, SearchProfile, Vacancy } from './types'
+import { loadNiches, matchesNiche, nicheWords, saveNiches, type NicheSettings } from './niche'
 
 export interface VacancyRow extends Vacancy {
   first_seen: string | null
@@ -11,6 +12,10 @@ interface Store {
   loading: boolean
   error: string | null
   vacancies: VacancyRow[]
+  /** вакансии с учётом фильтра «только мои ниши» */
+  visible: VacancyRow[]
+  niches: NicheSettings
+  setNiches: (n: NicheSettings) => void
   profiles: SearchProfile[]
   settings: AppSettings | null
   reload: () => Promise<void>
@@ -35,6 +40,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [vacancies, setVacancies] = useState<VacancyRow[]>([])
   const [profiles, setProfiles] = useState<SearchProfile[]>([])
   const [settings, setSettings] = useState<AppSettings | null>(null)
+  const [niches, setNichesState] = useState<NicheSettings>(loadNiches)
+  const setNiches = useCallback((n: NicheSettings) => {
+    setNichesState(n)
+    saveNiches(n)
+  }, [])
   const [toasts, setToasts] = useState<{ id: number; msg: string; kind: 'ok' | 'error' }[]>([])
 
   const toast = useCallback((msg: string, kind: 'ok' | 'error' = 'ok') => {
@@ -100,9 +110,15 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     [vacancies, toast],
   )
 
+  const visible = useMemo(() => {
+    if (!niches.on) return vacancies
+    const words = nicheWords(niches)
+    return vacancies.filter((v) => matchesNiche(v, words))
+  }, [vacancies, niches])
+
   const value = useMemo(
-    () => ({ loading, error, vacancies, profiles, settings, reload, patchVacancy, removeVacancy, setSettings, setProfiles, toast }),
-    [loading, error, vacancies, profiles, settings, reload, patchVacancy, removeVacancy, toast],
+    () => ({ loading, error, vacancies, visible, niches, setNiches, profiles, settings, reload, patchVacancy, removeVacancy, setSettings, setProfiles, toast }),
+    [loading, error, vacancies, visible, niches, setNiches, profiles, settings, reload, patchVacancy, removeVacancy, toast],
   )
 
   return (

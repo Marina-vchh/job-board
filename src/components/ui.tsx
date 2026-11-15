@@ -1,6 +1,8 @@
 import { useState, type ReactNode } from 'react'
 import { X } from 'lucide-react'
 import { GROUP_STYLE, STATUSES, scoreGroup, statusInfo } from '../lib/format'
+import { NICHES } from '../lib/niche'
+import { useStore } from '../lib/store'
 import type { AppSettings } from '../lib/types'
 
 export function PageHeader({ title, subtitle, actions }: { title: string; subtitle?: ReactNode; actions?: ReactNode }) {
@@ -155,5 +157,31 @@ export function Stat({ label, value, hint, onClick, accent }: { label: string; v
       <p className={`mt-1 text-2xl font-semibold tabular-nums ${accent ?? ''}`}>{value}</p>
       {hint && <p className="mt-0.5 text-xs text-slate-400">{hint}</p>}
     </button>
+  )
+}
+
+export function NicheBar() {
+  const { niches, setNiches, vacancies, visible } = useStore()
+  return (
+    <div className="mb-4 flex flex-wrap items-center gap-2 text-sm">
+      <Toggle checked={niches.on} onChange={(on) => setNiches({ ...niches, on })} />
+      <span className="font-medium">Только мои ниши</span>
+      {NICHES.map((n) => {
+        const on = niches.ids.includes(n.id)
+        return (
+          <button
+            key={n.id}
+            disabled={!niches.on}
+            onClick={() => setNiches({ ...niches, ids: on ? niches.ids.filter((x) => x !== n.id) : [...niches.ids, n.id] })}
+            className={`chip px-2.5 py-1 disabled:opacity-40 ${on ? 'bg-indigo-600 text-white ring-indigo-600' : 'bg-white text-slate-500 ring-slate-300 dark:bg-slate-900 dark:ring-slate-700'}`}
+          >
+            {n.label}
+          </button>
+        )
+      })}
+      <span className="text-xs text-slate-400">
+        {niches.on ? `показано ${visible.length} из ${vacancies.length}` : `показаны все ${vacancies.length}`}
+      </span>
+    </div>
   )
 }

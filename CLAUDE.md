@@ -25,6 +25,12 @@ The user is not a developer and writes in Russian — reply in Russian, keep exp
 > `supabase/migrations/20261115000005_cover_letters.sql` (пользователь запускает в SQL Editor); пока их нет — localStorage
 > (`src/lib/about.ts`). Профили: поля-списки читаются/пишутся в том формате, в каком хранятся в базе (`toList`/`fromList`),
 > поля нестрокового формата — только для чтения. Готовые профили под роли — `PRESETS` в `src/pages/Profiles.tsx`.
+>
+> **Ниши пользователя: iGaming, Dating, Adult.** Фронтенд-фильтр «Только мои ниши» (`src/lib/niche.ts`, вкл. по умолчанию,
+> настройка в localStorage) прячет вакансии без слов ниши. `MY_INDUSTRIES` в Profiles + кнопка «Добавить ниши во все профили».
+> Источники → блок «Telegram-каналы»: добавить/убрать канал; поддерживает и список каналов в `config` одного источника,
+> и «источник на канал» (`telegramLayout`). Предложенные каналы (`SUGGESTED`) найдены веб-поиском, не проверены отсюда (t.me закрыт прокси).
+> Бэкенд всё ещё не знает о нишах: жёсткий фильтр/штраф по индустрии нужно делать в scoring.ts (исходников нет).
 
 ## Live deployment (already running — don't recreate)
 

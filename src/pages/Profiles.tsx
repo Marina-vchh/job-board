@@ -65,36 +65,40 @@ const COMMON = {
   excluded_keywords: ['Intern', 'Internship', 'Trainee', 'Stážista'],
 }
 
+/** Ниши Марины: iGaming, Dating, Adult — ставятся в «Индустрии» всех готовых профилей. */
+export const MY_INDUSTRIES = ['iGaming', 'Gambling', 'Casino', 'Betting', 'Sportsbook', 'Poker', 'Dating', 'Adult', 'Webcam', '18+']
+const NICHE_KEYWORDS = ['iGaming', 'casino', 'betting', 'gambling', 'dating', 'adult', 'webcam']
+
 const PRESETS: { name: string; categories: string[]; keywords: string[]; industries: string[] }[] = [
   {
     name: 'Affiliate Manager',
     categories: ['Affiliate Manager', 'Affiliate Marketing Manager', 'Senior Affiliate Manager', 'Head of Affiliates', 'Affiliate Account Manager'],
     keywords: ['affiliate', 'affiliates', 'partners', 'CPA', 'RevShare', 'hybrid deals', 'traffic', 'media buying', 'affiliate network', 'tracking', 'postback', 'conversion', 'retention'],
-    industries: ['iGaming', 'Gambling', 'Betting', 'Fintech', 'Crypto', 'Forex', 'Nutra', 'E-commerce', 'AdTech'],
+    industries: MY_INDUSTRIES,
   },
   {
     name: 'Business Development',
     categories: ['Business Development Manager', 'BDM', 'Business Developer', 'Head of Business Development', 'Business Development Representative'],
     keywords: ['business development', 'lead generation', 'B2B', 'outreach', 'negotiation', 'deal closing', 'pipeline', 'CRM', 'new markets', 'conferences'],
-    industries: ['iGaming', 'Fintech', 'SaaS', 'AdTech', 'Crypto', 'Payments', 'E-commerce'],
+    industries: MY_INDUSTRIES,
   },
   {
     name: 'Partnerships Manager',
     categories: ['Partnerships Manager', 'Partner Manager', 'Strategic Partnerships Manager', 'Channel Manager', 'Alliances Manager', 'Head of Partnerships'],
     keywords: ['partnerships', 'partner program', 'integrations', 'co-marketing', 'channel', 'resellers', 'referral', 'partner onboarding', 'negotiation'],
-    industries: ['SaaS', 'Fintech', 'Payments', 'iGaming', 'AdTech', 'Crypto'],
+    industries: MY_INDUSTRIES,
   },
   {
     name: 'Account / Key Account Manager',
     categories: ['Account Manager', 'Key Account Manager', 'Client Success Manager', 'Customer Success Manager', 'Relationship Manager'],
     keywords: ['account management', 'key accounts', 'upsell', 'retention', 'client relations', 'KPI', 'reporting', 'onboarding', 'churn'],
-    industries: ['iGaming', 'Fintech', 'SaaS', 'AdTech', 'Payments', 'E-commerce'],
+    industries: MY_INDUSTRIES,
   },
   {
     name: 'Sales Manager (B2B)',
     categories: ['Sales Manager', 'B2B Sales Manager', 'Account Executive', 'Sales Executive', 'Head of Sales'],
     keywords: ['B2B sales', 'cold outreach', 'demo', 'closing', 'quota', 'pipeline', 'CRM', 'HubSpot', 'Salesforce', 'negotiation'],
-    industries: ['SaaS', 'Fintech', 'iGaming', 'AdTech', 'Payments'],
+    industries: MY_INDUSTRIES,
   },
 ]
 
@@ -131,6 +135,8 @@ export default function Profiles() {
       />
 
       <AboutMe />
+
+      <SetNiches shapes={shapes} />
 
       {presetsOpen && (
         <Presets
@@ -191,6 +197,45 @@ export default function Profiles() {
   )
 }
 
+// ---------- Ниши во все профили ----------
+function SetNiches({ shapes }: { shapes: Record<ListKey, Shape> }) {
+  const { profiles, setProfiles, toast } = useStore()
+  const [busy, setBusy] = useState(false)
+  const pending = profiles.filter((p) => !MY_INDUSTRIES.every((i) => toList(p.industries).map((x) => x.toLowerCase()).includes(i.toLowerCase())))
+  if (!profiles.length || !pending.length || shapes.industries === 'other') return null
+
+  const apply = async () => {
+    setBusy(true)
+    try {
+      const updated: SearchProfile[] = []
+      for (const p of pending) {
+        const merged = [...new Set([...MY_INDUSTRIES, ...toList(p.industries)])]
+        updated.push(await saveProfile({ id: p.id, industries: fromList(merged, shapes.industries) as string[] }))
+      }
+      setProfiles(profiles.map((p) => updated.find((u) => u.id === p.id) ?? p))
+      toast('Ниши добавлены во все профили. Баллы пересчитаются при следующем поиске.')
+    } catch (e) {
+      toast('Не получилось: ' + (e as Error).message, 'error')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="card mt-4 flex flex-wrap items-center gap-3 p-4">
+      <p className="min-w-0 flex-1 text-sm">
+        <b>Ваши ниши: iGaming, Dating, Adult.</b>{' '}
+        <span className="text-slate-500">
+          В {pending.length} {pending.length === 1 ? 'профиле' : 'профилях'} их нет в «Индустриях», поэтому такие вакансии не получают за индустрию +20 баллов.
+        </span>
+      </p>
+      <button className="btn-primary" onClick={apply} disabled={busy}>
+        {busy && <Loader2 className="size-4 animate-spin" />} Добавить ниши во все профили
+      </button>
+    </div>
+  )
+}
+
 // ---------- Готовые профили ----------
 function Presets({ existing, shapes, onCreated }: { existing: string[]; shapes: Record<ListKey, Shape>; onCreated: (p: SearchProfile[]) => void }) {
   const { toast } = useStore()
@@ -204,7 +249,7 @@ function Presets({ existing, shapes, onCreated }: { existing: string[]; shapes: 
     try {
       for (const p of available.filter((x) => chosen.includes(x.name))) {
         const row: Record<string, unknown> = { name: p.name, is_active: true }
-        const lists: Record<ListKey, string[]> = { ...COMMON, categories: p.categories, keywords: p.keywords, industries: p.industries }
+        const lists: Record<ListKey, string[]> = { ...COMMON, categories: p.categories, keywords: [...p.keywords, ...NICHE_KEYWORDS], industries: p.industries }
         for (const k of ALL_LIST_KEYS) if (shapes[k] !== 'other') row[k] = fromList(lists[k], shapes[k])
         created.push(await saveProfile(row as Partial<SearchProfile>))
       }

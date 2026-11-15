@@ -5,11 +5,11 @@ import { GROUP_LABEL, fmtDateTime, isToday, scoreGroup } from '../lib/format'
 import { listNotifications, listRuns, markNotificationsRead, runSearchNow } from '../lib/api'
 import { navigate } from '../lib/router'
 import type { AppNotification, ScoreGroup, SearchRun } from '../lib/types'
-import { Empty, PageHeader, Stat } from '../components/ui'
+import { Empty, NicheBar, PageHeader, Stat } from '../components/ui'
 import { VacancyCard, VacancyDetail } from '../components/Vacancy'
 
 export default function Dashboard() {
-  const { vacancies, settings, loading, error, reload, toast } = useStore()
+  const { vacancies: allVacancies, visible: vacancies, settings, loading, error, reload, toast } = useStore()
   const [open, setOpen] = useState<VacancyRow | null>(null)
   const [runs, setRuns] = useState<SearchRun[]>([])
   const [notes, setNotes] = useState<AppNotification[]>([])
@@ -100,6 +100,8 @@ export default function Dashboard() {
         }
       />
 
+      <NicheBar />
+
       {error && <p className="card mb-4 border-rose-200 bg-rose-50 p-4 text-sm text-rose-700 dark:bg-rose-950">{error}</p>}
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
@@ -129,7 +131,7 @@ export default function Dashboard() {
       )}
 
       <div className="mt-8 space-y-8">
-        {loading && !vacancies.length ? (
+        {loading && !allVacancies.length ? (
           <div className="flex justify-center py-12">
             <Loader2 className="size-6 animate-spin text-indigo-600" />
           </div>
@@ -169,7 +171,7 @@ export default function Dashboard() {
         )}
       </div>
 
-      <VacancyDetail v={open ? vacancies.find((x) => x.id === open.id) ?? null : null} onClose={() => setOpen(null)} />
+      <VacancyDetail v={open ? allVacancies.find((x) => x.id === open.id) ?? null : null} onClose={() => setOpen(null)} />
     </>
   )
 }

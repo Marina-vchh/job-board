@@ -4,14 +4,14 @@ import { useStore, type VacancyRow } from '../lib/store'
 import { STATUSES, cleanCompany, isToday, scoreGroup, statusInfo } from '../lib/format'
 import { navigate } from '../lib/router'
 import type { ScoreGroup } from '../lib/types'
-import { Empty, PageHeader } from '../components/ui'
+import { Empty, NicheBar, PageHeader } from '../components/ui'
 import { VacancyCard, VacancyDetail } from '../components/Vacancy'
 
 type Sort = 'score' | 'new' | 'company'
 const PAGE = 50
 
 export default function VacancyList({ params }: { params: URLSearchParams }) {
-  const { vacancies, settings, profiles, loading } = useStore()
+  const { vacancies: allVacancies, visible: vacancies, settings, profiles, loading, niches } = useStore()
   const [q, setQ] = useState(params.get('q') ?? '')
   const [group, setGroup] = useState<'' | ScoreGroup>((params.get('group') as ScoreGroup) ?? '')
   const [status, setStatus] = useState(params.get('status') ?? '')
@@ -107,6 +107,8 @@ export default function VacancyList({ params }: { params: URLSearchParams }) {
         }
       />
 
+      <NicheBar />
+
       <div className="card mb-4 space-y-3 p-3">
         <div className="relative">
           <Search className="absolute top-2.5 left-3 size-4 text-slate-400" />
@@ -176,13 +178,17 @@ export default function VacancyList({ params }: { params: URLSearchParams }) {
         </div>
       </div>
 
-      {loading && !vacancies.length ? (
+      {loading && !allVacancies.length ? (
         <div className="flex justify-center py-12">
           <Loader2 className="size-6 animate-spin text-indigo-600" />
         </div>
       ) : filtered.length === 0 ? (
         <Empty title="Ничего не найдено">
-          {anyFilter ? 'Попробуйте убрать часть фильтров.' : 'Вакансий пока нет — дождитесь утреннего поиска или запустите его на главной.'}
+          {anyFilter
+            ? 'Попробуйте убрать часть фильтров.'
+            : niches.on && allVacancies.length
+              ? 'В ваших нишах вакансий пока нет. Выключите «Только мои ниши», чтобы увидеть все.'
+              : 'Вакансий пока нет. Дождитесь утреннего поиска или запустите его на главной.'}
           {!anyFilter && (
             <div className="mt-3">
               <button className="btn-primary" onClick={() => navigate('dashboard')}>
@@ -204,7 +210,7 @@ export default function VacancyList({ params }: { params: URLSearchParams }) {
         </div>
       )}
 
-      <VacancyDetail v={open ? vacancies.find((v) => v.id === open) ?? null : null} onClose={() => setOpen(null)} statusExtra={extraStatuses} />
+      <VacancyDetail v={open ? allVacancies.find((v) => v.id === open) ?? null : null} onClose={() => setOpen(null)} statusExtra={extraStatuses} />
     </>
   )
 }
